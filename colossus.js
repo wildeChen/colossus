@@ -9,7 +9,8 @@ var require, define;
         isBrowser = !!(typeof window !== 'undefined' && typeof navigator !== 'undefined' && window.document),
         isWebWorker = !isBrowser && typeof importScripts !== 'undefined',
         readyRegExp = isBrowser && navigator.platform === 'PLAYSTATION 3' ? /^complete$/ : /^(complete|loaded)$/,
-        dataMain;
+        dataMain,
+        head = document.getElementsByTagName('head')[0];
 
     var delegate = function () {
         /**
@@ -143,26 +144,70 @@ var require, define;
         }
     };
 
-    var test = function (e) {
-        debugger;
+    var module = function () {
+
     };
 
+    var req = function () {
+        this.module = {}
+    };
 
-    require = function (dependencies,callback) {
+    req.prototype.load = function (moduleName,url) {
         var head = document.getElementsByTagName('head')[0];
-        var script;
-        dependencies.forEach(function (t) {
-            script = document.createElement('script');
-            script.src = t;
-            script.addEventListener('load', test, false);
-            script.addEventListener('error', test, false);
-            head.appendChild(script);
-        })
+
+        var node =  document.createElement('script');
+        node.type = 'text/javascript';
+        node.charset = 'utf-8';
+        node.async = true;
+
+        node.setAttribute('c-module', moduleName);
+        script.addEventListener('load', this.onScriptLoad, false);
+        script.addEventListener('error', this.onScriptError, false);
+        node.src = url;
+        head.appendChild(script);
     };
 
+    req.prototype.onScriptLoad = function (e) {
+        if (e.type === 'load' || (readyRegExp.test((e.currentTarget || e.srcElement).readyState))) {
 
+            //Pull out the name of the module and the context.
+            var data = this._getScriptDate(e);
+            this.completeLoad(data.id);
+        }
+    };
 
-    define = function (name, dependencies, callback) {
+    req.prototype.onScriptError = function (e) {
+
+    };
+
+    req.prototype.completeLoad = function (moduleName) {
+
+    };
+    
+    req.prototype._getScriptDate = function (e) {
+        var node = e.currentTarget || e.srcElement;
+
+        node.removeEventListener('load',this.onScriptLoad, false);
+        node.removeEventListener('error',this.onScriptError,false);
+
+        return {
+            node: node,
+            id: node && node.getAttribute('c-module')
+        };
+    };
+
+    req.prototype.checkDependency = function (dependencies) {
+        
+    };
+    
+
+    colossus.req = new req();
+
+    colossus.require = require = function (dependencies,callback) {
+        
+    };
+
+    colossus.define = define = function (name, dependencies, callback) {
         var node, context;
 
         if (typeof name !== 'string') {
@@ -184,14 +229,11 @@ var require, define;
      * 启动
      */
     if (isBrowser) {
-        var head = document.getElementsByTagName('head')[0];
+
         var script = document.getElementsByTagName('script');
         script = Array.apply(null, script);
         script.reverse();
         script.some(function (t) {
-            if (!head) {
-                head = t.parentNode;
-            }
             dataMain = t.getAttribute('c-main');
             if (dataMain) {
                 var mainScript = document.createElement('script');
