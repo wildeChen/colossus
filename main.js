@@ -1,4 +1,10 @@
+colossus.config({
+    paths:{
 
-require(['js/cc.js'],function () {
-    console.log('22');
+    }
 });
+
+colossus.init(function () {
+    console.log('start');
+});
+
