@@ -1,15 +1,20 @@
 'use strict';
 
 window.colossus = {};
-var require, define;
+let require, define;
 (function () {
 
+    /**
+     * DOM ready方法
+     * @param callback
+     * @return {boolean}
+     */
     function documentReady(callback) {
-        var result = document.readyState === "complete" || (document.readyState !== "loading" && !document.documentElement.doScroll);
+        let result = document.readyState === "complete" || (document.readyState !== "loading" && !document.documentElement.doScroll);
         if (callback) {
-            if(result)
+            if (result)
                 callback();
-            else{
+            else {
                 document.addEventListener("DOMContentLoaded", callback);
             }
         } else {
@@ -21,8 +26,13 @@ var require, define;
         return Object.prototype.hasOwnProperty.call(obj, prop);
     }
 
+    /**
+     * 对象key遍历方法
+     * @param obj
+     * @param func
+     */
     function eachProp(obj, func) {
-        var prop;
+        let prop;
         for (prop in obj) {
             if (hasProp(obj, prop)) {
                 if (func(obj[prop], prop)) {
@@ -32,11 +42,10 @@ var require, define;
         }
     }
 
-    var colossus = {};
-    var commentRegExp = /\/\*[\s\S]*?\*\/|([^:"'=]|^)\/\/.*$/mg,
+    let colossus = {};
+    let commentRegExp = /\/\*[\s\S]*?\*\/|([^:"'=]|^)\/\/.*$/mg,
         cjsRequireRegExp = /[^.]\s*require\s*\(\s*["']([^'"\s]+)["']\s*\)/g,
         isBrowser = !!(typeof window !== 'undefined' && typeof navigator !== 'undefined' && window.document),
-        isWebWorker = !isBrowser && typeof importScripts !== 'undefined',
         readyRegExp = isBrowser && navigator.platform === 'PLAYSTATION 3' ? /^complete$/ : /^(complete|loaded)$/,
         dataMain,
         head = document.getElementsByTagName('head')[0],
@@ -52,7 +61,7 @@ var require, define;
      * @param obj
      */
     colossus.config = function (obj) {
-        var allow = {
+        let allow = {
             paths: true
         };
 
@@ -66,7 +75,7 @@ var require, define;
         });
     };
 
-    var delegate = function () {
+    let delegate = function () {
         /**
          * @desc 监听器存取对象
          * @type {object}
@@ -79,7 +88,7 @@ var require, define;
         if (this._listeners === undefined)
             this._listeners = {};
 
-        var listeners = this._listeners;
+        let listeners = this._listeners;
         if (listeners[type] === undefined)
             listeners[type] = [];
 
@@ -98,18 +107,18 @@ var require, define;
         if (this._listeners === undefined)
             return;
 
-        var listeners = this._listeners;
-        var listenerArray = listeners[event];
+        let listeners = this._listeners;
+        let listenerArray = listeners[event];
 
         if (listenerArray !== undefined) {
 
             if (!eventData)
                 eventData = null;
 
-            var array = [];
-            var length = listenerArray.length;
+            let array = [];
+            let length = listenerArray.length;
 
-            for (var i = 0; i < length; i++) {
+            for (let i = 0; i < length; i++) {
                 array[i] = listenerArray[i];
             }
 
@@ -126,10 +135,10 @@ var require, define;
         if (this._listeners === undefined)
             return false;
 
-        var listeners = this._listeners;
+        let listeners = this._listeners;
         if (listeners[type] !== undefined) {
-            for (var i = 0, len = listeners[type].length; i < len; i++) {
-                var selListener = listeners[type][i];
+            for (let i = 0, len = listeners[type].length; i < len; i++) {
+                let selListener = listeners[type][i];
                 if (selListener.callback === listener && selListener.eventTarget === target)
                     return true;
             }
@@ -146,13 +155,13 @@ var require, define;
         if (this._listeners === undefined)
             return;
 
-        var listeners = this._listeners;
-        for (var key in listeners) {
-            var listenerArray = listeners[key];
+        let listeners = this._listeners;
+        for (let key in listeners) {
+            let listenerArray = listeners[key];
 
             if (listenerArray !== undefined) {
-                for (var i = 0; i < listenerArray.length;) {
-                    var selListener = listenerArray[i];
+                for (let i = 0; i < listenerArray.length;) {
+                    let selListener = listenerArray[i];
                     if (selListener.eventTarget === target)
                         listenerArray.splice(i, 1);
                     else
@@ -172,12 +181,12 @@ var require, define;
         if (this._listeners === undefined)
             return;
 
-        var listeners = this._listeners;
-        var listenerArray = listeners[type];
+        let listeners = this._listeners;
+        let listenerArray = listeners[type];
 
         if (listenerArray !== undefined) {
-            for (var i = 0; i < listenerArray.length;) {
-                var selListener = listenerArray[i];
+            for (let i = 0; i < listenerArray.length;) {
+                let selListener = listenerArray[i];
                 if (selListener.eventTarget === target)
                     listenerArray.splice(i, 1);
                 else
@@ -188,10 +197,54 @@ var require, define;
 
     colossus.delegate = new delegate();
 
+    colossus.send = function (options) {
+        let type = options.type || 'GET';
+        let url = options.url;
+        if (!url)
+            return console.error('请求地址不能为空');
+
+        let data = options.data;
+        if (!!data && !colossus.tool.isArray(data) && !colossus.tool.isFunction(data) && !(data instanceof RegExp)) {
+            if (type === 'GET') {
+                let str = '';
+                eachProp(data, function (val, key) {
+                    str += ('&' + key + '=' + val);
+                });
+                data = str.slice(1);
+            }
+        } else {
+            return console.error('请求参数 data %s 格式不合法', data);
+        }
+
+        let dataType = options.dataType || 'text';
+        let xhr = new XMLHttpRequest();
+        xhr.open(type, url, true);
+        if (type === "POST" || type === "post") {
+            xhr.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+        }
+        xhr.send(data);
+
+        return new Promise((resolve, reject) => {
+            xhr.onreadystatechange = () => {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        if (dataType === "json" || dataType === "JSON") {
+                            resolve(JSON.parse(xhr.responseText))
+                        } else {
+                            resolve(xhr.responseText);
+                        }
+                    } else {
+                        reject(xhr);
+                    }
+                }
+            }
+        })
+    };
+
     colossus.tool = {
         extend: function (target, source, deep) {
             if (source) {
-                var prop, value;
+                let prop, value;
                 for (prop in source) {
                     value = source[prop];
                     if (deep && value && typeof value === 'object' && !colossus.tool.isArray(value) && !colossus.tool.isFunction(value) && !(value instanceof RegExp)) {
@@ -214,7 +267,7 @@ var require, define;
         }
     };
 
-    var module = function (dependency, callback) {
+    let module = function (dependency, callback) {
         this.dependency = dependency;
         this.ready = false;
         this.callback = callback;
@@ -225,7 +278,7 @@ var require, define;
         }
     };
 
-    var Req = function () {
+    let Req = function () {
         this.module = {};
         this.requireSequence = [];
         this.defined = [];
@@ -257,15 +310,15 @@ var require, define;
             return;
         url = cfg.paths[moduleName] || moduleName;
 
-        if(url.indexOf('js') === -1){
-            if(cfg.paths[moduleName])
-                return console.error('module %s address %s is invalid',moduleName,url);
+        if (url.indexOf('js') === -1) {
+            if (cfg.paths[moduleName])
+                return console.error('module %s address %s is invalid', moduleName, url);
             else
-                return console.error('module %s is not exist',moduleName);
+                return console.error('module %s is not exist', moduleName);
         }
-        var head = document.getElementsByTagName('head')[0];
+        let head = document.getElementsByTagName('head')[0];
 
-        var node = document.createElement('script');
+        let node = document.createElement('script');
         node.type = 'text/javascript';
         node.charset = 'utf-8';
         node.async = true;
@@ -280,20 +333,20 @@ var require, define;
 
     Req.prototype._onScriptLoad = function (e) {
         if (e.type === 'load' || (readyRegExp.test((e.currentTarget || e.srcElement).readyState))) {
-            var data = this._getScriptDate(e);
+            let data = this._getScriptDate(e);
             this._completeLoad(data.id);
         }
     };
 
     Req.prototype._onScriptError = function (e) {
-        var script = e.currentTarget;
-        var module = script.getAttribute('c-module');
-        var url = script.getAttribute('src');
-        console.error('download module %s failed , address %s is not exist',module,url)
+        let script = e.currentTarget;
+        let module = script.getAttribute('c-module');
+        let url = script.getAttribute('src');
+        console.error('download module %s failed , address %s is not exist', module, url)
     };
 
     Req.prototype._completeLoad = function (moduleName) {
-        var target = this.defined.shift();
+        let target = this.defined.shift();
         if (target[0] === null) {
             target[0] = moduleName;
         }
@@ -302,11 +355,11 @@ var require, define;
     };
 
     Req.prototype._callFinishedModule = function () {
-        var loop = false;
+        let loop = false;
         eachProp(this.module, function (obj) {
             if (!obj.ready) {
                 if (this.checkDependency(obj.dependency)) {
-                    var dep = this.getDependency(obj.dependency);
+                    let dep = this.getDependency(obj.dependency);
                     obj.func = obj.callback.apply(obj.callback, dep);
                     obj.ready = true;
                     loop = true;
@@ -321,13 +374,13 @@ var require, define;
     };
 
     Req.prototype._callFinishedRequire = function () {
-        var len = this.requireSequence.length;
+        let len = this.requireSequence.length;
         if (this.requireSequence) {
-            for (var i = len - 1; i >= 0;) {
-                var t = this.requireSequence[i];
+            for (let i = len - 1; i >= 0;) {
+                let t = this.requireSequence[i];
                 if (this.checkDependency(t[0])) {
-                    var c = this.requireSequence.pop();
-                    var dep = this.getDependency(c[0]);
+                    let c = this.requireSequence.pop();
+                    let dep = this.getDependency(c[0]);
                     c[1].apply(c[1], dep);
                 }
                 i--;
@@ -337,7 +390,7 @@ var require, define;
     };
 
     Req.prototype._getScriptDate = function (e) {
-        var node = e.currentTarget || e.srcElement;
+        let node = e.currentTarget || e.srcElement;
 
         node.removeEventListener('load', this._onScriptLoad, false);
         node.removeEventListener('error', this._onScriptError, false);
@@ -348,7 +401,7 @@ var require, define;
         };
     };
 
-    var req = new Req();
+    let req = new Req();
 
     colossus.require = require = function (dependencies, callback) {
         if (!callback) {
@@ -360,7 +413,7 @@ var require, define;
             callback();
         } else {
             if (req.checkDependency(dependencies)) {
-                var dep = req.getDependency(dependencies);
+                let dep = req.getDependency(dependencies);
                 callback.apply(callback, dep);
             } else {
                 if (dependencies instanceof Array) {
@@ -404,13 +457,13 @@ var require, define;
      * 启动
      */
     if (isBrowser) {
-        var script = document.getElementsByTagName('script');
+        let script = document.getElementsByTagName('script');
         script = Array.apply(null, script);
         script.reverse();
         script.some(function (t) {
             dataMain = t.getAttribute('c-main');
             if (dataMain) {
-                var mainScript = document.createElement('script');
+                let mainScript = document.createElement('script');
                 mainScript.src = dataMain;
                 head.appendChild(mainScript);
                 return true;
