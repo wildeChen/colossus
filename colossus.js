@@ -3,7 +3,6 @@
 window.colossus = {};
 let require, define;
 (function () {
-
     /**
      * DOM ready方法
      * @param callback
@@ -52,20 +51,31 @@ let require, define;
         cfg = {
             paths: {}
         },
-        router = {},
+        router = {
+            'home': {
+                address: './js/model/home',
+                renderer: 'main'
+            }
+        },
         map = {},
         plus = {};
+
+    colossus.address = {
+        old: null,
+        current: null,
+        search: null
+    };
 
     /**
      * 合并默认配置
      * @param obj
      */
-    colossus.config = function (obj) {
+    colossus.config = (obj) => {
         let allow = {
             paths: true
         };
 
-        eachProp(obj, function (value, prop) {
+        eachProp(obj, (value, prop) => {
             if (allow[prop]) {
                 if (!cfg[prop]) {
                     cfg[prop] = {};
@@ -73,6 +83,14 @@ let require, define;
                 colossus.tool.extend(cfg[prop], value, true);
             }
         });
+    };
+
+    colossus.route = (data) => {
+        if (!!data && !colossus.tool.isArray(data) && !colossus.tool.isFunction(data) && !(data instanceof RegExp)) {
+            colossus.tool.extend(router, data);
+        } else {
+            console.error('路由设置错误, %s', data);
+        }
     };
 
     let delegate = function () {
@@ -122,7 +140,7 @@ let require, define;
                 array[i] = listenerArray[i];
             }
 
-            for (i = 0; i < length; i++) {
+            for (let i = 0; i < length; i++) {
                 array[i].callback.call(array[i].eventTarget, eventData);
             }
 
@@ -212,17 +230,22 @@ let require, define;
                 });
                 data = str.slice(1);
             }
-        } else {
+        } else if (!!data) {
             return console.error('请求参数 data %s 格式不合法', data);
         }
 
         let dataType = options.dataType || 'text';
         let xhr = new XMLHttpRequest();
-        xhr.open(type, url, true);
-        if (type === "POST" || type === "post") {
+        if (type === 'POST' || type === 'post') {
+            xhr.open(type, url, true);
             xhr.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+            xhr.send(data);
+        } else if (type === 'GET' || type === 'get') {
+            if (!!data)
+                url += '?' + data;
+            xhr.open(type, url, true);
+            xhr.send();
         }
-        xhr.send(data);
 
         return new Promise((resolve, reject) => {
             xhr.onreadystatechange = () => {
@@ -266,6 +289,69 @@ let require, define;
             return Object.prototype.toString.call(it) === '[object Function]';
         }
     };
+
+    window.addEventListener('hashchange', (event) => {
+        _processURL(event);
+        _analyzeURL();
+    }, false);
+
+    /**
+     * process url from hash
+     * @param event
+     * @private
+     */
+    function _processURL(event) {
+        if (!!event) {
+            colossus.address.current = event.newURL.split('#')[1];
+            colossus.address.old = event.oldURL.split('#')[1];
+        } else {
+            if (location.hash === '') {
+                colossus.address.current = 'home';
+            } else {
+                colossus.address.current = location.hash.split('#')[1];
+            }
+        }
+        let search = {};
+        let address = colossus.address.current;
+        address = address.split('?');
+        if (address.length > 1) {
+            address = address[1].split('&');
+            for (let i = 0, len = address.length; i < len; i++) {
+                let key = address[i].split('=');
+                search[key[0]] = key[1];
+            }
+        }
+        colossus.address.search = search;
+    }
+
+    /**
+     * analyze url from route
+     * @private
+     */
+    function _analyzeURL() {
+        let url = colossus.address.current.split('?')[0];
+        let html = router[url].address + '.html';
+        if (!!map[url]) {
+            _renderer(url)
+        } else {
+            colossus.send({
+                url: html
+            }).then((text) => {
+                map[url] = text;
+                _renderer(url)
+            })
+        }
+    }
+
+    /**
+     * render page
+     * @param url
+     * @private
+     */
+    function _renderer(url) {
+        debugger;
+    }
+
 
     let module = function (dependency, callback) {
         this.dependency = dependency;
@@ -450,6 +536,8 @@ let require, define;
 
     colossus.init = function (dependencies, callback) {
         console.info('start to init');
+        _processURL();
+        _analyzeURL();
         return require(dependencies, callback);
     };
 
