@@ -60,14 +60,8 @@ let require, define;
         map = {},
         plus = {};
 
-    colossus.address = {
-        old: null,
-        current: null,
-        search: null
-    };
-
     /**
-     * 合并默认配置
+     * 设置默认配置
      * @param obj
      */
     colossus.config = (obj) => {
@@ -85,6 +79,10 @@ let require, define;
         });
     };
 
+    /**
+     * 设置路由
+     * @param data
+     */
     colossus.route = (data) => {
         if (!!data && !colossus.tool.isArray(data) && !colossus.tool.isFunction(data) && !(data instanceof RegExp)) {
             colossus.tool.extend(router, data);
@@ -265,7 +263,7 @@ let require, define;
     };
 
     colossus.tool = {
-        extend: function (target, source, deep) {
+        extend(target, source, deep) {
             if (source) {
                 let prop, value;
                 for (prop in source) {
@@ -282,16 +280,45 @@ let require, define;
             }
             return target;
         },
-        isArray: function (it) {
+        isArray(it) {
             return Object.prototype.toString.call(it) === '[object Array]';
         },
-        isFunction: function (it) {
+        isFunction(it) {
             return Object.prototype.toString.call(it) === '[object Function]';
+        },
+    };
+
+    colossus.browser = {
+        address: {
+            old: null,
+            current: null,
+            search: null
+        },
+        history: [],
+        loadHistory() {
+            this.history.push(this.address.current);
+        },
+        back() {
+            if (!!this.address.old && this.history.length >= 1) {
+                this.address.current = this.address.old;
+                this.address.old = null;
+                window.history.back();
+            } else {
+                location.hash = '';
+            }
+        },
+        load(newUrl, oldUrl) {
+            this.address.current = newUrl;
+            this.address.old = oldUrl;
         }
     };
 
+    /**
+     * hashchange监听
+     */
     window.addEventListener('hashchange', (event) => {
         _processURL(event);
+        _processSearch();
         _analyzeURL();
     }, false);
 
@@ -302,26 +329,34 @@ let require, define;
      */
     function _processURL(event) {
         if (!!event) {
-            colossus.address.current = event.newURL.split('#')[1];
-            colossus.address.old = event.oldURL.split('#')[1];
+            colossus.browser.load(event.newURL.split('#')[1] || 'home', event.oldURL.split('#')[1] || 'home');
         } else {
             if (location.hash === '') {
-                colossus.address.current = 'home';
+                colossus.browser.address.current = 'home';
             } else {
-                colossus.address.current = location.hash.split('#')[1];
+                colossus.browser.address.current = location.hash.split('#')[1];
             }
         }
+        colossus.browser.loadHistory();
+    }
+
+    /**
+     * process search key from current
+     * @private
+     */
+    function _processSearch() {
         let search = {};
-        let address = colossus.address.current;
-        address = address.split('?');
-        if (address.length > 1) {
-            address = address[1].split('&');
-            for (let i = 0, len = address.length; i < len; i++) {
-                let key = address[i].split('=');
+        let c = this.browser.address.current;
+        c = c.split('?');
+        if (c.length > 1) {
+            c = c[1].split('&');
+            for (let i = 0, len = c.length; i < len; i++) {
+                let key = c[i].split('=');
                 search[key[0]] = key[1];
             }
         }
-        colossus.address.search = search;
+        address.search = search;
+        address.current = address.current.split('?')[0];
     }
 
     /**
@@ -329,17 +364,21 @@ let require, define;
      * @private
      */
     function _analyzeURL() {
-        let url = colossus.address.current.split('?')[0];
-        let html = router[url].address + '.html';
-        if (!!map[url]) {
-            _renderer(url)
-        } else {
-            colossus.send({
-                url: html
-            }).then((text) => {
-                map[url] = text;
+        let url = address.current.split('?')[0];
+        if (!!router[url]) {
+            let html = router[url].address + '.html';
+            if (!!map[url]) {
                 _renderer(url)
-            })
+            } else {
+                colossus.send({
+                    url: html
+                }).then((text) => {
+                    map[url] = text;
+                    _renderer(url)
+                })
+            }
+        } else {
+            colossus.browser.back();
         }
     }
 
@@ -349,7 +388,7 @@ let require, define;
      * @private
      */
     function _renderer(url) {
-        debugger;
+
     }
 
 
@@ -364,130 +403,118 @@ let require, define;
         }
     };
 
-    let Req = function () {
-        this.module = {};
-        this.requireSequence = [];
-        this.defined = [];
-        this.loadSequence = {};
-    };
+    let req = {
+        module: {},
+        requireSequence: [],
+        defined: [],
+        loadSequence: {},
+        checkDependency(dependencies) {
+            if (typeof dependencies === 'string') {
+                dependencies = [dependencies]
+            }
 
-    Req.prototype.checkDependency = function (dependencies) {
-        if (typeof dependencies === 'string') {
-            dependencies = [dependencies]
-        }
-
-        if (dependencies instanceof Array) {
-            return dependencies.every(function (t) {
-                return this.module[t] && this.module[t].ready
+            if (dependencies instanceof Array) {
+                return dependencies.every(function (t) {
+                    return this.module[t] && this.module[t].ready
+                }.bind(this))
+            } else {
+                return console.error('depend %s is incorrect', dependencies);
+            }
+        },
+        getDependency(dependencies) {
+            return dependencies.map(function (t) {
+                return this.module[t].func;
             }.bind(this))
-        } else {
-            return console.error('depend %s is incorrect', dependencies);
-        }
-    };
+        },
+        load(moduleName, url) {
+            if (this.loadSequence[moduleName])
+                return;
+            url = cfg.paths[moduleName] || moduleName;
 
-    Req.prototype.getDependency = function (dependencies) {
-        return dependencies.map(function (t) {
-            return this.module[t].func;
-        }.bind(this))
-    };
-
-    Req.prototype.load = function (moduleName, url) {
-        if (this.loadSequence[moduleName])
-            return;
-        url = cfg.paths[moduleName] || moduleName;
-
-        if (url.indexOf('js') === -1) {
-            if (cfg.paths[moduleName])
-                return console.error('module %s address %s is invalid', moduleName, url);
-            else
-                return console.error('module %s is not exist', moduleName);
-        }
-        let head = document.getElementsByTagName('head')[0];
-
-        let node = document.createElement('script');
-        node.type = 'text/javascript';
-        node.charset = 'utf-8';
-        node.async = true;
-
-        node.setAttribute('c-module', moduleName);
-        node.addEventListener('load', this._onScriptLoad.bind(this), false);
-        node.addEventListener('error', this._onScriptError.bind(this), false);
-        node.src = url;
-        this.loadSequence[moduleName] = true;
-        head.appendChild(node);
-    };
-
-    Req.prototype._onScriptLoad = function (e) {
-        if (e.type === 'load' || (readyRegExp.test((e.currentTarget || e.srcElement).readyState))) {
-            let data = this._getScriptDate(e);
-            this._completeLoad(data.id);
-        }
-    };
-
-    Req.prototype._onScriptError = function (e) {
-        let script = e.currentTarget;
-        let module = script.getAttribute('c-module');
-        let url = script.getAttribute('src');
-        console.error('download module %s failed , address %s is not exist', module, url)
-    };
-
-    Req.prototype._completeLoad = function (moduleName) {
-        let target = this.defined.shift();
-        if (target[0] === null) {
-            target[0] = moduleName;
-        }
-        this.module[moduleName] = new module(target[1], target[2]);
-        this._callFinishedModule();
-    };
-
-    Req.prototype._callFinishedModule = function () {
-        let loop = false;
-        eachProp(this.module, function (obj) {
-            if (!obj.ready) {
-                if (this.checkDependency(obj.dependency)) {
-                    let dep = this.getDependency(obj.dependency);
-                    obj.func = obj.callback.apply(obj.callback, dep);
-                    obj.ready = true;
-                    loop = true;
-                }
+            if (url.indexOf('js') === -1) {
+                if (cfg.paths[moduleName])
+                    return console.error('module %s address %s is invalid', moduleName, url);
+                else
+                    return console.error('module %s is not exist', moduleName);
             }
-        }.bind(this));
-        if (loop) {
+            let head = document.getElementsByTagName('head')[0];
+
+            let node = document.createElement('script');
+            node.type = 'text/javascript';
+            node.charset = 'utf-8';
+            node.async = true;
+
+            node.setAttribute('c-module', moduleName);
+            node.addEventListener('load', this._onScriptLoad.bind(this), false);
+            node.addEventListener('error', this._onScriptError.bind(this), false);
+            node.src = url;
+            this.loadSequence[moduleName] = true;
+            head.appendChild(node);
+        },
+        _onScriptLoad(e) {
+            if (e.type === 'load' || (readyRegExp.test((e.currentTarget || e.srcElement).readyState))) {
+                let data = this._getScriptDate(e);
+                this._completeLoad(data.id);
+            }
+        },
+        _onScriptError(e) {
+            let script = e.currentTarget;
+            let module = script.getAttribute('c-module');
+            let url = script.getAttribute('src');
+            console.error('download module %s failed , address %s is not exist', module, url)
+        },
+        _completeLoad(moduleName) {
+            let target = this.defined.shift();
+            if (target[0] === null) {
+                target[0] = moduleName;
+            }
+            this.module[moduleName] = new module(target[1], target[2]);
             this._callFinishedModule();
-        } else {
-            this._callFinishedRequire();
-        }
-    };
-
-    Req.prototype._callFinishedRequire = function () {
-        let len = this.requireSequence.length;
-        if (this.requireSequence) {
-            for (let i = len - 1; i >= 0;) {
-                let t = this.requireSequence[i];
-                if (this.checkDependency(t[0])) {
-                    let c = this.requireSequence.pop();
-                    let dep = this.getDependency(c[0]);
-                    c[1].apply(c[1], dep);
+        },
+        _callFinishedModule() {
+            let loop = false;
+            eachProp(this.module, function (obj) {
+                if (!obj.ready) {
+                    if (this.checkDependency(obj.dependency)) {
+                        let dep = this.getDependency(obj.dependency);
+                        obj.func = obj.callback.apply(obj.callback, dep);
+                        obj.ready = true;
+                        loop = true;
+                    }
                 }
-                i--;
-
+            }.bind(this));
+            if (loop) {
+                this._callFinishedModule();
+            } else {
+                this._callFinishedRequire();
             }
+        },
+        _callFinishedRequire() {
+            let len = this.requireSequence.length;
+            if (this.requireSequence) {
+                for (let i = len - 1; i >= 0;) {
+                    let t = this.requireSequence[i];
+                    if (this.checkDependency(t[0])) {
+                        let c = this.requireSequence.pop();
+                        let dep = this.getDependency(c[0]);
+                        c[1].apply(c[1], dep);
+                    }
+                    i--;
+                }
+            }
+        },
+        _getScriptDate(e) {
+            let node = e.currentTarget || e.srcElement;
+
+            node.removeEventListener('load', this._onScriptLoad, false);
+            node.removeEventListener('error', this._onScriptError, false);
+
+            return {
+                node: node,
+                id: node && node.getAttribute('c-module')
+            };
         }
     };
-
-    Req.prototype._getScriptDate = function (e) {
-        let node = e.currentTarget || e.srcElement;
-
-        node.removeEventListener('load', this._onScriptLoad, false);
-        node.removeEventListener('error', this._onScriptError, false);
-
-        return {
-            node: node,
-            id: node && node.getAttribute('c-module')
-        };
-    };
-
-    let req = new Req();
 
     colossus.require = require = function (dependencies, callback) {
         if (!callback) {
@@ -535,9 +562,7 @@ let require, define;
     };
 
     colossus.init = function (dependencies, callback) {
-        console.info('start to init');
-        _processURL();
-        _analyzeURL();
+        console.trace('start to init');
         return require(dependencies, callback);
     };
 

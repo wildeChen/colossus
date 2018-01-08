@@ -1,10 +1,10 @@
 colossus.config({
     paths:{
-
+        'loop':'js/loop'
     }
 });
 
-colossus.init(function () {
-    console.log('start');
+colossus.init(['loop'],function (loop) {
+    console.log('start %s',loop.name);
 });
 
