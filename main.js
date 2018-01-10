@@ -1,6 +1,6 @@
 colossus.config({
     paths:{
-        'loop':'js/loop'
+        'loop':'js/loop.js'
     }
 });
 

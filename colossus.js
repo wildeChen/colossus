@@ -8,7 +8,7 @@ let require, define;
      * @param callback
      * @return {boolean}
      */
-    function documentReady(callback) {
+    const documentReady = function(callback) {
         let result = document.readyState === "complete" || (document.readyState !== "loading" && !document.documentElement.doScroll);
         if (callback) {
             if (result)
@@ -19,18 +19,18 @@ let require, define;
         } else {
             return result;
         }
-    }
+    };
 
-    function hasProp(obj, prop) {
+    const hasProp = function(obj, prop) {
         return Object.prototype.hasOwnProperty.call(obj, prop);
-    }
+    };
 
     /**
      * 对象key遍历方法
      * @param obj
      * @param func
      */
-    function eachProp(obj, func) {
+    const eachProp = function(obj, func) {
         let prop;
         for (prop in obj) {
             if (hasProp(obj, prop)) {
@@ -39,7 +39,7 @@ let require, define;
                 }
             }
         }
-    }
+    };
 
     let colossus = {};
     let commentRegExp = /\/\*[\s\S]*?\*\/|([^:"'=]|^)\/\/.*$/mg,
@@ -64,7 +64,7 @@ let require, define;
      * 设置默认配置
      * @param obj
      */
-    colossus.config = (obj) => {
+    colossus.config = function (obj){
         let allow = {
             paths: true
         };
@@ -83,7 +83,7 @@ let require, define;
      * 设置路由
      * @param data
      */
-    colossus.route = (data) => {
+    colossus.route = function (data) {
         if (!!data && !colossus.tool.isArray(data) && !colossus.tool.isFunction(data) && !(data instanceof RegExp)) {
             colossus.tool.extend(router, data);
         } else {
@@ -91,128 +91,11 @@ let require, define;
         }
     };
 
-    let delegate = function () {
-        /**
-         * @desc 监听器存取对象
-         * @type {object}
-         * @private
-         */
-        this._listeners = {};
-    };
-
-    delegate.prototype.add = function (type, listener, target) {
-        if (this._listeners === undefined)
-            this._listeners = {};
-
-        let listeners = this._listeners;
-        if (listeners[type] === undefined)
-            listeners[type] = [];
-
-        if (!this._hasDelegate(type, listener, target))
-            listeners[type].push({callback: listener, eventTarget: target});
-    };
-
     /**
-     * @description dispatch specific event with data @eventData
-     * 通过指定的event字符串来唤醒注册的代理事件
-     * @param {string} event
-     * @param [eventData] {*}
-     * @param [clearAfterDispatch] {boolean}
+     * ajax请求模块
+     * @param options
+     * @return {Promise}
      */
-    delegate.prototype.dispatch = function (event, eventData, clearAfterDispatch) {
-        if (this._listeners === undefined)
-            return;
-
-        let listeners = this._listeners;
-        let listenerArray = listeners[event];
-
-        if (listenerArray !== undefined) {
-
-            if (!eventData)
-                eventData = null;
-
-            let array = [];
-            let length = listenerArray.length;
-
-            for (let i = 0; i < length; i++) {
-                array[i] = listenerArray[i];
-            }
-
-            for (let i = 0; i < length; i++) {
-                array[i].callback.call(array[i].eventTarget, eventData);
-            }
-
-            if (!!clearAfterDispatch)
-                listenerArray.length = 0;
-        }
-    };
-
-    delegate.prototype._hasDelegate = function (type, listener, target) {
-        if (this._listeners === undefined)
-            return false;
-
-        let listeners = this._listeners;
-        if (listeners[type] !== undefined) {
-            for (let i = 0, len = listeners[type].length; i < len; i++) {
-                let selListener = listeners[type][i];
-                if (selListener.callback === listener && selListener.eventTarget === target)
-                    return true;
-            }
-        }
-        return false;
-    };
-
-    /**
-     * @description remove all delegate event on specific instance
-     * 移除指定实例上的所有代理事件
-     * @param target
-     */
-    delegate.prototype.cleanDelegate = function (target) {
-        if (this._listeners === undefined)
-            return;
-
-        let listeners = this._listeners;
-        for (let key in listeners) {
-            let listenerArray = listeners[key];
-
-            if (listenerArray !== undefined) {
-                for (let i = 0; i < listenerArray.length;) {
-                    let selListener = listenerArray[i];
-                    if (selListener.eventTarget === target)
-                        listenerArray.splice(i, 1);
-                    else
-                        i++
-                }
-            }
-        }
-    };
-
-    /**
-     * @description remove specific type of delegate on specific target instance
-     * 从指定实例上移除指定的事件代理
-     * @param type
-     * @param target
-     */
-    delegate.prototype.removeDelegate = function (type, target) {
-        if (this._listeners === undefined)
-            return;
-
-        let listeners = this._listeners;
-        let listenerArray = listeners[type];
-
-        if (listenerArray !== undefined) {
-            for (let i = 0; i < listenerArray.length;) {
-                let selListener = listenerArray[i];
-                if (selListener.eventTarget === target)
-                    listenerArray.splice(i, 1);
-                else
-                    i++
-            }
-        }
-    };
-
-    colossus.delegate = new delegate();
-
     colossus.send = function (options) {
         let type = options.type || 'GET';
         let url = options.url;
@@ -262,6 +145,106 @@ let require, define;
         })
     };
 
+    /**
+     * 代理模块
+     */
+    colossus.delegate = {
+        /**
+         * @description 监听器存取对象
+         * @type {object}
+         * @private
+         */
+        _listeners: {},
+        add(type, listener, target) {
+            if (this._listeners === undefined)
+                this._listeners = {};
+
+            let listeners = this._listeners;
+            if (listeners[type] === undefined)
+                listeners[type] = [];
+
+            if (!this._hasDelegate(type, listener, target))
+                listeners[type].push({callback: listener, eventTarget: target});
+        },
+        dispatch(event, eventData, clearAfterDispatch) {
+            if (this._listeners === undefined)
+                return;
+
+            let listeners = this._listeners;
+            let listenerArray = listeners[event];
+
+            if (listenerArray !== undefined) {
+
+                if (!eventData)
+                    eventData = null;
+
+                let array = [];
+                let length = listenerArray.length;
+
+                for (let i = 0; i < length; i++) {
+                    array[i] = listenerArray[i];
+                }
+
+                for (let i = 0; i < length; i++) {
+                    array[i].callback.call(array[i].eventTarget, eventData);
+                }
+
+                if (!!clearAfterDispatch)
+                    listenerArray.length = 0;
+            }
+        },
+        _hasDelegate(type, listener, target) {
+            if (this._listeners === undefined)
+                return false;
+
+            let listeners = this._listeners;
+            if (listeners[type] !== undefined) {
+                for (let i = 0, len = listeners[type].length; i < len; i++) {
+                    let selListener = listeners[type][i];
+                    if (selListener.callback === listener && selListener.eventTarget === target)
+                        return true;
+                }
+            }
+            return false;
+        },
+        cleanDelegate(target) {
+            if (this._listeners === undefined)
+                return;
+
+            let listeners = this._listeners;
+            for (let key in listeners) {
+                let listenerArray = listeners[key];
+
+                if (listenerArray !== undefined) {
+                    for (let i = 0; i < listenerArray.length;) {
+                        let selListener = listenerArray[i];
+                        if (selListener.eventTarget === target)
+                            listenerArray.splice(i, 1);
+                        else
+                            i++
+                    }
+                }
+            }
+        },
+        removeDelegate(type, target) {
+            if (this._listeners === undefined)
+                return;
+
+            let listeners = this._listeners;
+            let listenerArray = listeners[type];
+
+            if (listenerArray !== undefined) {
+                for (let i = 0; i < listenerArray.length;) {
+                    let selListener = listenerArray[i];
+                    if (selListener.eventTarget === target)
+                        listenerArray.splice(i, 1);
+                    else
+                        i++
+                }
+            }
+        }
+    };
+
     colossus.tool = {
         extend(target, source, deep) {
             if (source) {
@@ -288,6 +271,9 @@ let require, define;
         },
     };
 
+    /**
+     * 浏览器模块
+     */
     colossus.browser = {
         address: {
             old: null,
@@ -321,6 +307,15 @@ let require, define;
         _processSearch();
         _analyzeURL();
     }, false);
+
+    //todo 路由解析- (写入临时解析结果   url search)
+    //todo 无路由回退-    特殊回退( 无old to home 有old history.back() )
+
+    //todo 路由流
+    //todo 设置流回转url
+
+    //todo 路由写入
+    //todo 路由渲染
 
     /**
      * process url from hash
@@ -431,7 +426,8 @@ let require, define;
                 return;
             url = cfg.paths[moduleName] || moduleName;
 
-            if (url.indexOf('js') === -1) {
+            let len = url.length;
+            if (url.lastIndexOf('js') !== (len - 2)) {
                 if (cfg.paths[moduleName])
                     return console.error('module %s address %s is invalid', moduleName, url);
                 else
